@@ -1,0 +1,82 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    background-color: #f4f4f4;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+#reservation-grid {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    table-layout: fixed;
+}
+
+#reservation-grid th, #reservation-grid td {
+    border: 1px solid #ccc;
+    padding: 5px;
+    text-align: center;
+    height: 40px;
+    font-size: 12px;
+    cursor: pointer; /* 예약된 셀 클릭을 위한 커서 */
+}
+
+#reservation-grid th {
+    background-color: #e0e0e0;
+}
+
+/* 예약된 시간의 스타일 */
+.reserved {
+    background-color: #ff9999; /* 예약된 셀의 색깔 */
+    color: #333;
+    font-weight: bold;
+}
+
+/* 모달 스타일 */
+.modal {
+    display: none; /* 기본 숨김 */
+    position: fixed; 
+    z-index: 1; 
+    left: 0;
+    top: 0;
+    width: 100%; 
+    height: 100%; 
+    overflow: auto; 
+    background-color: rgba(0,0,0,0.4); 
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 15% auto; 
+    padding: 20px;
+    border: 1px solid #888;
+    width: 300px;
+    text-align: center;
+    border-radius: 8px;
+}
+
+.close-button {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.close-button:hover,
+.close-button:focus {
+    color: black;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+/* style.css에 추가 */
+.past-time {
+    background-color: #e9e9e9 !important; /* 연한 회색 */
+    color: #a0a0a0;
+    cursor: default !important;
+    pointer-events: none; /* 클릭 이벤트 비활성화 */
+}
