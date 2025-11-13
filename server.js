@@ -1,4 +1,4 @@
-﻿require('dotenv').config();
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const http = require('http');
@@ -41,24 +41,59 @@ app.get('/api/reservations', async (req, res) => {
     }
 });
 
+// 이름 유효성 검사 함수
+const isValidName = (name) => {
+    return typeof name === 'string' && /^[가-힣a-zA-Z0-9\s]{1,20}$/.test(name.trim());
+};
+
 // 예약 추가
 app.post('/api/reservations', async (req, res) => {
     try {
         const { name, date, startTime, endTime } = req.body;
+
+        // 필수값 체크
+        if (!name || !date || typeof startTime !== 'number' || typeof endTime !== 'number') {
+            return res.status(400).send("모든 필드를 올바르게 입력하세요.");
+        }
+
+        // 이름 유효성 검사
+        if (!isValidName(name)) {
+            return res.status(400).send("이름 형식이 올바르지 않습니다. (한글/영문/숫자 1~20자)");
+        }
+
+        // 날짜 형식 검사 및 과거 날짜 차단
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const targetDate = new Date(date);
+        targetDate.setHours(0, 0, 0, 0);
+
+        if (isNaN(targetDate.getTime())) {
+            return res.status(400).send("유효하지 않은 날짜입니다.");
+        }
+
+        if (targetDate < today) {
+            return res.status(400).send("지난 날짜에는 예약할 수 없습니다.");
+        }
+
+        // 시간 범위 검사
+        if (startTime < 6 || endTime > 24 || endTime <= startTime) {
+            return res.status(400).send("유효한 시간 범위를 선택하세요. (6~24시 사이)");
+        }
+
         const duration = endTime - startTime;
 
-        // 하루 최대 2시간
+        // 하루 최대 2시간 제한
         const dayReservations = await Reservation.aggregate([
             { $match: { date } },
             { $group: { _id: "$name", total: { $sum: { $subtract: ["$endTime", "$startTime"] } } } }
         ]);
 
-        const today = dayReservations.find(r => r._id === name);
-        if (today && today.total + duration > 2) {
+        const todayUsage = dayReservations.find(r => r._id === name);
+        if (todayUsage && todayUsage.total + duration > 2) {
             return res.status(400).send("하루 최대 2시간까지 예약 가능합니다.");
         }
 
-        // 주간 최대 6시간
+        // 주간 최대 6시간 제한
         const dayObj = new Date(date);
         const weekStart = new Date(dayObj);
         weekStart.setDate(dayObj.getDate() - dayObj.getDay() + 1); // 월요일
@@ -69,7 +104,10 @@ app.post('/api/reservations', async (req, res) => {
             {
                 $match: {
                     name,
-                    date: { $gte: weekStart.toISOString().split('T')[0], $lte: weekEnd.toISOString().split('T')[0] }
+                    date: {
+                        $gte: weekStart.toISOString().split('T')[0],
+                        $lte: weekEnd.toISOString().split('T')[0]
+                    }
                 }
             },
             { $group: { _id: "$name", total: { $sum: { $subtract: ["$endTime", "$startTime"] } } } }
@@ -89,8 +127,11 @@ app.post('/api/reservations', async (req, res) => {
             ]
         });
 
-        if (conflict) return res.status(400).send("이미 예약된 시간이 있습니다.");
+        if (conflict) {
+            return res.status(400).send("이미 예약된 시간이 있습니다.");
+        }
 
+        // 예약 저장
         const newReservation = new Reservation({ name, date, startTime, endTime });
         await newReservation.save();
 
