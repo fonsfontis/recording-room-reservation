@@ -5,6 +5,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 const session = require('express-session');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
@@ -47,16 +48,17 @@ app.use(session({
     }
 }));
 
-// -------------------------------------------------------------
-// 1️⃣ 정적 파일 제공 (★ 반드시 인증보다 먼저 와야 한다!)
-// -------------------------------------------------------------
-app.use(express.static(path.join(__dirname, 'public')));
+// ---------------------------
+// 1️⃣ 정적 파일 제공 (인증 없이 접근 가능, 항상 제일 먼저)
+const publicPath = path.join(__dirname, 'public');
+console.log("STATIC PATH = ", publicPath);
+console.log("FILES = ", fs.readdirSync(publicPath));
+app.use(express.static(publicPath));
 
-// -------------------------------------------------------------
-// 2️⃣ 로그인 라우트 (정적 파일과 함께 인증 없이 접근 가능)
-// -------------------------------------------------------------
+// ---------------------------
+// 2️⃣ 로그인 페이지
 app.get('/login', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'login.html'));
+    res.sendFile(path.join(publicPath, 'login.html'));
 });
 
 app.post('/login', (req, res) => {
@@ -68,27 +70,24 @@ app.post('/login', (req, res) => {
     res.send("<h3>잘못된 인증번호입니다.</h3><a href='/login'>다시 시도</a>");
 });
 
-// -------------------------------------------------------------
+// ---------------------------
 // 3️⃣ 인증 확인 API
-// -------------------------------------------------------------
 app.get('/check-auth', (req, res) => {
     if (req.session.authenticated) return res.status(200).json({ ok: true });
     res.status(401).json({ ok: false });
 });
 
-// -------------------------------------------------------------
-// 4️⃣ 인증 미들웨어 (이 아래 라우트는 모두 인증 필요)
-// -------------------------------------------------------------
+// ---------------------------
+// 4️⃣ 인증 미들웨어
 function checkAuth(req, res, next) {
     if (req.session.authenticated) return next();
     res.redirect('/login');
 }
 
-// -------------------------------------------------------------
+// ---------------------------
 // 5️⃣ 인증 필요한 메인 및 API
-// -------------------------------------------------------------
 app.get('/', checkAuth, (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    res.sendFile(path.join(publicPath, 'index.html'));
 });
 
 app.get('/api/reservations', checkAuth, async (req, res) => {
@@ -114,11 +113,11 @@ app.post('/api/reservations', checkAuth, async (req, res) => {
         if (today && today.total + duration > 2)
             return res.status(400).send("하루 최대 2시간까지 예약 가능합니다.");
 
-        // 주간 범위 계산
+        // 주간 최대 6시간
         const dayObj = new Date(date);
         const weekStart = new Date(dayObj);
         weekStart.setDate(dayObj.getDate() - dayObj.getDay() + (dayObj.getDay() === 0 ? -6 : 1));
-        weekStart.setHours(0, 0, 0, 0);
+        weekStart.setHours(0,0,0,0);
 
         const weekEnd = new Date(weekStart);
         weekEnd.setDate(weekStart.getDate() + 6);
@@ -127,7 +126,7 @@ app.post('/api/reservations', checkAuth, async (req, res) => {
             {
                 $match: {
                     name,
-                    date: {
+                    date: { 
                         $gte: weekStart.toISOString().split('T')[0],
                         $lte: weekEnd.toISOString().split('T')[0]
                     }
@@ -176,7 +175,6 @@ app.delete('/api/reservations/:id', checkAuth, async (req, res) => {
 
 // ---------------------------
 // Socket.io
-// ---------------------------
 io.on('connection', (socket) => {
     console.log('사용자가 연결되었습니다.');
     socket.on('disconnect', () => console.log('사용자가 연결을 종료했습니다.'));
@@ -184,6 +182,5 @@ io.on('connection', (socket) => {
 
 // ---------------------------
 // 서버 실행
-// ---------------------------
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`서버가 ${PORT} 포트에서 실행 중입니다.`));
