@@ -6,6 +6,14 @@
     <title>레코딩룸 예약 시스템</title>
     <link rel="stylesheet" href="/style.css">
 </head>
+<script>
+    // 세션 기반 인증
+    fetch('/check-auth')
+        .then(res => {
+            if (res.status !== 200) window.location.href = '/login';
+        })
+        .catch(() => { window.location.href = '/login'; });
+</script>
 <body>
     <header>
         <h1>🎹 레코딩룸 예약 시스템</h1>
