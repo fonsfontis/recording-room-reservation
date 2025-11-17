@@ -1,10 +1,28 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>레코딩룸 예약 시스템</title>
     <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>레코딩룸 예약 시스템</title>
+    <link rel="stylesheet" href="style.css">
+
+    <!-- ✅ 여기에 추가 -->
+    <script>
+        // 세션 기반 인증을 서버에서 확인
+        fetch('/check-auth', { credentials: 'include' })
+            .then(res => {
+                if (res.status !== 200) {
+                    window.location.href = '/login';
+                }
+            })
+            .catch(() => {
+                window.location.href = '/login';
+            });
+    </script>
 </head>
 <body>
     <header>
@@ -14,38 +32,29 @@
     </header>
 
     <main>
-        <!-- ✅ 예약 입력 섹션 -->
-<section id="reservation-form">
-    <h2>예약하기</h2>
-    <label for="res-name">이름:</label>
-    <input type="text" id="res-name" placeholder="예약자 이름" required>
-
-    <label for="res-day">날짜:</label>
-    <select id="res-day"></select>
-
-    <label for="res-start-time">시작시간:</label>
-    <select id="res-start-time"></select>
-
-    <label for="res-end-time">종료시간:</label>
-    <select id="res-end-time"></select>
-
-    <button id="submit-res">예약 신청</button>
-    <p id="reservation-message"></p>
-</section>
+        <section id="reservation-form">
+            <h2>예약하기</h2>
+            <label for="res-name">이름:</label>
+            <input type="text" id="res-name" placeholder="예약자 이름" required>
+            <label for="res-day">날짜:</label>
+            <select id="res-day"></select>
+            <label for="res-start-time">시작시간:</label>
+            <select id="res-start-time"></select>
+            <label for="res-end-time">종료시간:</label>
+            <select id="res-end-time"></select>
+            <button id="submit-res">예약 신청</button>
+            <p id="reservation-message"></p>
+        </section>
         
         <hr>
 
-        <!-- ✅ 주간 예약 현황 -->
         <section id="reservation-status">
             <h2>🗓️ 주간 예약 현황</h2>
-
-            <!-- 주간 네비게이션: 표 바깥으로 이동 -->
             <div id="week-navigation" style="text-align: center; margin-bottom: 10px;">
                 <button id="prev-week-btn">◀ 이전 주</button>
                 <span id="current-week-display"></span>
                 <button id="next-week-btn">다음 주 ▶</button>
             </div>
-
             <table id="reservation-grid">
                 <thead>
                     <tr id="time-header"></tr>
@@ -55,7 +64,6 @@
         </section>
     </main>
 
-    <!-- ✅ 예약 취소 모달 -->
     <div id="modal" class="modal">
         <div class="modal-content">
             <span class="close-button">&times;</span>
@@ -64,8 +72,7 @@
         </div>
     </div>
 
-    <!-- ✅ 스크립트 -->
-     <script src="/socket.io/socket.io.js"></script>
-     <script src="script.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>

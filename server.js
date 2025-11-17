@@ -3,36 +3,103 @@ const express = require('express');
 const mongoose = require('mongoose');
 const http = require('http');
 const socketIo = require('socket.io');
+const session = require('express-session');
+const path = require('path');
 const cors = require('cors');
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
+// --- Render 환경: HTTPS 프록시 신뢰
+app.set('trust proxy', 1);
+
+// ---------------------------
 // MongoDB 연결
+// ---------------------------
 mongoose.connect(process.env.MONGODB_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true
 }).then(() => console.log("MongoDB 연결 성공"))
   .catch(err => console.error("MongoDB 연결 실패:", err));
 
+// ---------------------------
 // 예약 모델
+// ---------------------------
 const Reservation = mongoose.model('Reservation', {
     name: String,
-    date: String,       // YYYY-MM-DD
-    startTime: Number,  // 6~23
+    date: String,
+    startTime: Number,
     endTime: Number
 });
 
+// ---------------------------
 // 미들웨어
-app.use(cors());
+// ---------------------------
+app.use(cors({
+    origin: true,
+    credentials: true
+}));
 app.use(express.json());
-app.use(express.static(__dirname + '/public')); // public 폴더 정적 제공
+app.use(express.urlencoded({ extended: true }));
 
-// ----------------- 예약 API -----------------
+app.use(session({
+    secret: "REALLY_SECRET_KEY",
+    resave: false,
+    saveUninitialized: true,
+    cookie: {
+        maxAge: 1000 * 60 * 60, // 1시간
+        secure: process.env.NODE_ENV === 'production', // Render에서는 HTTPS
+        sameSite: 'lax'
+    }
+}));
 
-// 예약 조회
-app.get('/api/reservations', async (req, res) => {
+// ---------------------------
+// 인증 미들웨어
+// ---------------------------
+function checkAuth(req, res, next) {
+    if (req.session.authenticated) return next();
+    res.redirect('/login');
+}
+
+// ---------------------------
+// 로그인 페이지
+// ---------------------------
+app.get('/login', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+app.post('/login', (req, res) => {
+    const userCode = req.body.code;
+    if (userCode === process.env.LOGIN_CODE) {
+        req.session.authenticated = true;
+        return res.redirect('/');
+    }
+    res.send("<h3>잘못된 인증번호입니다.</h3><a href='/login'>다시 시도</a>");
+});
+
+// ---------------------------
+// 인증 확인 API (클라이언트 fetch용)
+app.get('/check-auth', (req, res) => {
+    if (req.session.authenticated) return res.status(200).json({ ok: true });
+    res.status(401).json({ ok: false });
+});
+
+// ---------------------------
+// 메인 페이지
+// ---------------------------
+app.get('/', checkAuth, (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// ---------------------------
+// 정적 파일 제공 (CSS, JS 등) - 인증 필요
+app.use('/public', checkAuth, express.static(path.join(__dirname, 'public')));
+
+// ---------------------------
+// 예약 API (인증 필요)
+// ---------------------------
+app.get('/api/reservations', checkAuth, async (req, res) => {
     try {
         const reservations = await Reservation.find();
         res.json(reservations);
@@ -41,13 +108,11 @@ app.get('/api/reservations', async (req, res) => {
     }
 });
 
-// 예약 추가
-app.post('/api/reservations', async (req, res) => {
+app.post('/api/reservations', checkAuth, async (req, res) => {
     try {
         const { name, date, startTime, endTime } = req.body;
         const duration = endTime - startTime;
 
-        // 하루 최대 2시간
         const dayReservations = await Reservation.aggregate([
             { $match: { date } },
             { $group: { _id: "$name", total: { $sum: { $subtract: ["$endTime", "$startTime"] } } } }
@@ -103,8 +168,7 @@ app.post('/api/reservations', async (req, res) => {
     }
 });
 
-// 예약 취소
-app.delete('/api/reservations/:id', async (req, res) => {
+app.delete('/api/reservations/:id', checkAuth, async (req, res) => {
     try {
         const result = await Reservation.findByIdAndDelete(req.params.id);
         if (!result) return res.status(404).json({ message: "예약을 찾을 수 없습니다." });
@@ -115,16 +179,19 @@ app.delete('/api/reservations/:id', async (req, res) => {
     }
 });
 
-// ----------------- Socket.io -----------------
+// ---------------------------
+// Socket.io
+// ---------------------------
 io.on('connection', (socket) => {
     console.log('사용자가 연결되었습니다.');
-
     socket.on('disconnect', () => {
         console.log('사용자가 연결을 종료했습니다.');
     });
 });
 
-// ----------------- 서버 실행 -----------------
+// ---------------------------
+// 서버 실행
+// ---------------------------
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`서버가 ${PORT} 포트에서 실행 중입니다.`);
