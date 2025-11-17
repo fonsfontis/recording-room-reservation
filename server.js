@@ -48,9 +48,9 @@ app.use(session({
 }));
 
 // ---------------------------
-// ✅ 정적 파일은 인증 없이 제공 (수정됨: /static 경로 추가)
+// ✅ 정적 파일은 인증 없이 제공 (다시 수정: 경로 접두사 제거)
 // ---------------------------
-app.use('/static', express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // ---------------------------
 // 로그인 페이지
