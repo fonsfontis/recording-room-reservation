@@ -42,9 +42,14 @@ app.use(session({
     saveUninitialized: true,
     cookie: { 
         maxAge: 1000 * 60 * 60, // 1시간
-        secure: process.env.NODE_ENV === 'production' // Render HTTPS 환경용
+        secure: process.env.NODE_ENV === 'production'
     }
 }));
+
+// ---------------------------
+// 정적 파일 제공 (인증 없이)
+// ---------------------------
+app.use(express.static(path.join(__dirname, 'public')));
 
 // ---------------------------
 // 인증 미들웨어
@@ -86,11 +91,8 @@ app.get('/', checkAuth, (req, res) => {
 });
 
 // ---------------------------
-// 정적 파일 제공 (CSS, JS 등)
-app.use(checkAuth, express.static(path.join(__dirname, 'public')));
-
-// ---------------------------
 // 예약 API
+// ---------------------------
 app.get('/api/reservations', checkAuth, async (req, res) => {
     try {
         const reservations = await Reservation.find();
