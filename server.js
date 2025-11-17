@@ -3,9 +3,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const http = require('http');
 const socketIo = require('socket.io');
-const session = require('express-session');
 const path = require('path');
-const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
@@ -37,60 +35,20 @@ const Reservation = mongoose.model('Reservation', {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.set('trust proxy', 1);
-app.use(session({
-    secret: "REALLY_SECRET_KEY",
-    resave: false,
-    saveUninitialized: true,
-    cookie: {
-        maxAge: 1000 * 60 * 60,
-        secure: process.env.NODE_ENV === 'production'
-    }
-}));
-
 // ---------------------------
-// 1️⃣ 정적 파일 제공 (인증 없이 접근 가능, 항상 제일 먼저)
+// 정적 파일 제공
 const publicPath = path.join(__dirname, 'public');
-console.log("STATIC PATH = ", publicPath);
-console.log("FILES = ", fs.readdirSync(publicPath));
 app.use(express.static(publicPath));
 
 // ---------------------------
-// 2️⃣ 로그인 페이지
-app.get('/login', (req, res) => {
-    res.sendFile(path.join(publicPath, 'login.html'));
-});
-
-app.post('/login', (req, res) => {
-    const userCode = req.body.code;
-    if (userCode === process.env.LOGIN_CODE) {
-        req.session.authenticated = true;
-        return res.redirect('/');
-    }
-    res.send("<h3>잘못된 인증번호입니다.</h3><a href='/login'>다시 시도</a>");
-});
-
-// ---------------------------
-// 3️⃣ 인증 확인 API
-app.get('/check-auth', (req, res) => {
-    if (req.session.authenticated) return res.status(200).json({ ok: true });
-    res.status(401).json({ ok: false });
-});
-
-// ---------------------------
-// 4️⃣ 인증 미들웨어
-function checkAuth(req, res, next) {
-    if (req.session.authenticated) return next();
-    res.redirect('/login');
-}
-
-// ---------------------------
-// 5️⃣ 인증 필요한 메인 및 API
-app.get('/', checkAuth, (req, res) => {
+// 메인 페이지
+app.get('/', (req, res) => {
     res.sendFile(path.join(publicPath, 'index.html'));
 });
 
-app.get('/api/reservations', checkAuth, async (req, res) => {
+// ---------------------------
+// 예약 API
+app.get('/api/reservations', async (req, res) => {
     try {
         const reservations = await Reservation.find();
         res.json(reservations);
@@ -99,7 +57,7 @@ app.get('/api/reservations', checkAuth, async (req, res) => {
     }
 });
 
-app.post('/api/reservations', checkAuth, async (req, res) => {
+app.post('/api/reservations', async (req, res) => {
     try {
         const { name, date, startTime, endTime } = req.body;
         const duration = endTime - startTime;
@@ -161,7 +119,7 @@ app.post('/api/reservations', checkAuth, async (req, res) => {
     }
 });
 
-app.delete('/api/reservations/:id', checkAuth, async (req, res) => {
+app.delete('/api/reservations/:id', async (req, res) => {
     try {
         const result = await Reservation.findByIdAndDelete(req.params.id);
         if (!result) return res.status(404).json({ message: "예약을 찾을 수 없습니다." });
