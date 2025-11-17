@@ -1,12 +1,7 @@
-﻿// ---------------------------
-// 🔧 DOM 요소
-// ---------------------------
-const socket = io();
+﻿// 🔧 DOM 요소
+const socket = io({ path: '/socket.io' });
 
-// 서버에서 예약 변경사항을 실시간으로 받으면 갱신
-socket.on("updateReservations", () => {
-    getReservationsFromServer();
-});
+socket.on("updateReservations", () => getReservationsFromServer());
 
 const resNameInput = document.getElementById("res-name");
 const resDaySelect = document.getElementById("res-day");
@@ -19,7 +14,6 @@ const timeHeader = document.getElementById("time-header");
 const currentWeekDisplay = document.getElementById("current-week-display");
 const prevWeekBtn = document.getElementById("prev-week-btn");
 const nextWeekBtn = document.getElementById("next-week-btn");
-
 const modal = document.getElementById("modal");
 const modalText = document.getElementById("modal-text");
 const closeBtn = document.querySelector(".close-button");

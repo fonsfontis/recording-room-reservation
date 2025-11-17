@@ -8,7 +8,7 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server);
+const io = socketIo(server, { path: '/socket.io' });
 
 // ---------------------------
 // MongoDB 연결
@@ -35,14 +35,14 @@ const Reservation = mongoose.model('Reservation', {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.set('trust proxy', 1); // Render HTTPS 적용
+app.set('trust proxy', 1); // HTTPS 환경
 app.use(session({
     secret: "REALLY_SECRET_KEY",
     resave: false,
     saveUninitialized: true,
     cookie: { 
-        maxAge: 1000 * 60 * 60, // 1시간
-        secure: process.env.NODE_ENV === 'production' // Render HTTPS 환경용
+        maxAge: 1000 * 60 * 60,
+        secure: process.env.NODE_ENV === 'production'
     }
 }));
 
@@ -55,10 +55,18 @@ function checkAuth(req, res, next) {
 }
 
 // ---------------------------
+// public 폴더 절대 경로
+// ---------------------------
+const publicPath = path.join(__dirname, 'public');
+
+// 정적 파일 제공 (CSS, JS)
+app.use('/static', express.static(publicPath));
+
+// ---------------------------
 // 로그인 페이지
 // ---------------------------
 app.get('/login', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'login.html'));
+    res.sendFile(path.join(publicPath, 'login.html'));
 });
 
 app.post('/login', (req, res) => {
@@ -82,13 +90,8 @@ app.get('/check-auth', (req, res) => {
 // 메인 페이지
 // ---------------------------
 app.get('/', checkAuth, (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    res.sendFile(path.join(publicPath, 'index.html'));
 });
-
-// ---------------------------
-// 정적 파일 제공 (CSS, JS 등) → checkAuth 제거
-// ---------------------------
-app.use(express.static(path.join(__dirname, 'public')));
 
 // ---------------------------
 // 예약 API
@@ -136,7 +139,7 @@ app.post('/api/reservations', checkAuth, async (req, res) => {
             date,
             $or: [
                 { startTime: { $lt: endTime, $gte: startTime } },
-                { endTime: { $gt: startTime, $lte: endTime } },
+                { endTime: { $gt: startHour, $lte: endTime } },
                 { startTime: { $lte: startTime }, endTime: { $gte: endTime } }
             ]
         });
@@ -167,7 +170,6 @@ app.delete('/api/reservations/:id', checkAuth, async (req, res) => {
 
 // ---------------------------
 // Socket.io
-// ---------------------------
 io.on('connection', (socket) => {
     console.log('사용자가 연결되었습니다.');
     socket.on('disconnect', () => console.log('사용자가 연결을 종료했습니다.'));
