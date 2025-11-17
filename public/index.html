@@ -5,25 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>레코딩룸 예약 시스템</title>
     <link rel="stylesheet" href="style.css">
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>레코딩룸 예약 시스템</title>
-    <link rel="stylesheet" href="style.css">
-
-    <!-- ✅ 여기에 추가 -->
-    <script>
-        // 세션 기반 인증을 서버에서 확인
-        fetch('/check-auth', { credentials: 'include' })
-            .then(res => {
-                if (res.status !== 200) {
-                    window.location.href = '/login';
-                }
-            })
-            .catch(() => {
-                window.location.href = '/login';
-            });
-    </script>
 </head>
+<script>
+    // 세션 기반 인증
+    fetch('/check-auth')
+        .then(res => {
+            if (res.status !== 200) window.location.href = '/login';
+        })
+        .catch(() => { window.location.href = '/login'; });
+</script>
 <body>
     <header>
         <h1>🎹 레코딩룸 예약 시스템</h1>
@@ -56,9 +46,7 @@
                 <button id="next-week-btn">다음 주 ▶</button>
             </div>
             <table id="reservation-grid">
-                <thead>
-                    <tr id="time-header"></tr>
-                </thead>
+                <thead><tr id="time-header"></tr></thead>
                 <tbody id="grid-body"></tbody>
             </table>
         </section>
