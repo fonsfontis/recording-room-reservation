@@ -48,17 +48,9 @@ app.use(session({
 }));
 
 // ---------------------------
-// ✅ 정적 파일은 인증 없이 제공 (중요!!)
+// ✅ 정적 파일은 인증 없이 제공 (수정됨: /static 경로 추가)
 // ---------------------------
-app.use(express.static(path.join(__dirname, 'public')));
-
-// ---------------------------
-// 인증 미들웨어
-// ---------------------------
-function checkAuth(req, res, next) {
-    if (req.session.authenticated) return next();
-    res.redirect('/login');
-}
+app.use('/static', express.static(path.join(__dirname, 'public')));
 
 // ---------------------------
 // 로그인 페이지
@@ -75,6 +67,15 @@ app.post('/login', (req, res) => {
     }
     res.send("<h3>잘못된 인증번호입니다.</h3><a href='/login'>다시 시도</a>");
 });
+
+// ---------------------------
+// 인증 미들웨어
+// ---------------------------
+function checkAuth(req, res, next) {
+    if (req.session.authenticated) return next();
+    // 정적 파일 요청이 /static 경로로 분리되었기 때문에, 이 리다이렉션은 오직 HTML 페이지 요청에만 적용됩니다.
+    res.redirect('/login'); 
+}
 
 // ---------------------------
 // 인증 확인 API
@@ -119,14 +120,19 @@ app.post('/api/reservations', checkAuth, async (req, res) => {
 
         // 주간 최대 6시간
         const dayObj = new Date(date);
-        const weekStart = new Date(dayObj); weekStart.setDate(dayObj.getDate() - dayObj.getDay() + 1);
+        // MongoDB 쿼리를 위해 날짜를 'YYYY-MM-DD' 형식으로 맞춥니다.
+        const weekStart = new Date(dayObj); weekStart.setDate(dayObj.getDate() - dayObj.getDay() + (dayObj.getDay() === 0 ? -6 : 1));
+        weekStart.setHours(0,0,0,0);
         const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6);
 
         const weekReservations = await Reservation.aggregate([
             {
                 $match: {
                     name,
-                    date: { $gte: weekStart.toISOString().split('T')[0], $lte: weekEnd.toISOString().split('T')[0] }
+                    date: { 
+                        $gte: weekStart.toISOString().split('T')[0], 
+                        $lte: weekEnd.toISOString().split('T')[0] 
+                    }
                 }
             },
             { $group: { _id: "$name", total: { $sum: { $subtract: ["$endTime", "$startTime"] } } } }
