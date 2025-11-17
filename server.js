@@ -47,14 +47,14 @@ app.use(session({
     }
 }));
 
-// ---------------------------
-// ✅ 정적 파일은 인증 없이 제공 (다시 수정: 경로 접두사 제거)
-// ---------------------------
+// -------------------------------------------------------------
+// 1️⃣ 정적 파일 제공 (★ 반드시 인증보다 먼저 와야 한다!)
+// -------------------------------------------------------------
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ---------------------------
-// 로그인 페이지
-// ---------------------------
+// -------------------------------------------------------------
+// 2️⃣ 로그인 라우트 (정적 파일과 함께 인증 없이 접근 가능)
+// -------------------------------------------------------------
 app.get('/login', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
@@ -68,33 +68,29 @@ app.post('/login', (req, res) => {
     res.send("<h3>잘못된 인증번호입니다.</h3><a href='/login'>다시 시도</a>");
 });
 
-// ---------------------------
-// 인증 미들웨어
-// ---------------------------
-function checkAuth(req, res, next) {
-    if (req.session.authenticated) return next();
-    // 정적 파일 요청이 /static 경로로 분리되었기 때문에, 이 리다이렉션은 오직 HTML 페이지 요청에만 적용됩니다.
-    res.redirect('/login'); 
-}
-
-// ---------------------------
-// 인증 확인 API
-// ---------------------------
+// -------------------------------------------------------------
+// 3️⃣ 인증 확인 API
+// -------------------------------------------------------------
 app.get('/check-auth', (req, res) => {
     if (req.session.authenticated) return res.status(200).json({ ok: true });
     res.status(401).json({ ok: false });
 });
 
-// ---------------------------
-// 메인 페이지 (로그인 필요)
-// ---------------------------
+// -------------------------------------------------------------
+// 4️⃣ 인증 미들웨어 (이 아래 라우트는 모두 인증 필요)
+// -------------------------------------------------------------
+function checkAuth(req, res, next) {
+    if (req.session.authenticated) return next();
+    res.redirect('/login');
+}
+
+// -------------------------------------------------------------
+// 5️⃣ 인증 필요한 메인 및 API
+// -------------------------------------------------------------
 app.get('/', checkAuth, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// ---------------------------
-// 예약 API (로그인 필요)
-// ---------------------------
 app.get('/api/reservations', checkAuth, async (req, res) => {
     try {
         const reservations = await Reservation.find();
@@ -118,20 +114,22 @@ app.post('/api/reservations', checkAuth, async (req, res) => {
         if (today && today.total + duration > 2)
             return res.status(400).send("하루 최대 2시간까지 예약 가능합니다.");
 
-        // 주간 최대 6시간
+        // 주간 범위 계산
         const dayObj = new Date(date);
-        // MongoDB 쿼리를 위해 날짜를 'YYYY-MM-DD' 형식으로 맞춥니다.
-        const weekStart = new Date(dayObj); weekStart.setDate(dayObj.getDate() - dayObj.getDay() + (dayObj.getDay() === 0 ? -6 : 1));
-        weekStart.setHours(0,0,0,0);
-        const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6);
+        const weekStart = new Date(dayObj);
+        weekStart.setDate(dayObj.getDate() - dayObj.getDay() + (dayObj.getDay() === 0 ? -6 : 1));
+        weekStart.setHours(0, 0, 0, 0);
+
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
 
         const weekReservations = await Reservation.aggregate([
             {
                 $match: {
                     name,
-                    date: { 
-                        $gte: weekStart.toISOString().split('T')[0], 
-                        $lte: weekEnd.toISOString().split('T')[0] 
+                    date: {
+                        $gte: weekStart.toISOString().split('T')[0],
+                        $lte: weekEnd.toISOString().split('T')[0]
                     }
                 }
             },
