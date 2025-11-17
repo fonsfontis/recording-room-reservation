@@ -42,14 +42,9 @@ app.use(session({
     saveUninitialized: true,
     cookie: { 
         maxAge: 1000 * 60 * 60, // 1시간
-        secure: process.env.NODE_ENV === 'production'
+        secure: process.env.NODE_ENV === 'production' // Render HTTPS 환경용
     }
 }));
-
-// ---------------------------
-// 정적 파일 제공 (인증 없이)
-// ---------------------------
-app.use(express.static(path.join(__dirname, 'public')));
 
 // ---------------------------
 // 인증 미들웨어
@@ -89,6 +84,11 @@ app.get('/check-auth', (req, res) => {
 app.get('/', checkAuth, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
+
+// ---------------------------
+// 정적 파일 제공 (CSS, JS 등) → checkAuth 제거
+// ---------------------------
+app.use(express.static(path.join(__dirname, 'public')));
 
 // ---------------------------
 // 예약 API
@@ -167,6 +167,7 @@ app.delete('/api/reservations/:id', checkAuth, async (req, res) => {
 
 // ---------------------------
 // Socket.io
+// ---------------------------
 io.on('connection', (socket) => {
     console.log('사용자가 연결되었습니다.');
     socket.on('disconnect', () => console.log('사용자가 연결을 종료했습니다.'));
@@ -174,5 +175,6 @@ io.on('connection', (socket) => {
 
 // ---------------------------
 // 서버 실행
+// ---------------------------
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`서버가 ${PORT} 포트에서 실행 중입니다.`));
