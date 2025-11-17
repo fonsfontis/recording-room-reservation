@@ -209,8 +209,8 @@ async function getReservationsFromServer() {
         reservationsArray.forEach(res => {
             const dateObj = new Date(res.date);
             const year = dateObj.getFullYear();
-            const month = dateObj.getMonth() + 1;
-            const day = dateObj.getDate();
+            const month = String(dateObj.getMonth() + 1).padStart(2, '0'); // 0 패딩 적용
+            const day = String(dateObj.getDate()).padStart(2, '0');         // 0 패딩 적용
 
             const start = parseInt(res.startTime);
             const end = parseInt(res.endTime);
