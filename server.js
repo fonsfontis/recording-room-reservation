@@ -8,7 +8,7 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server, { path: '/socket.io' });
+const io = socketIo(server);
 
 // ---------------------------
 // MongoDB 연결
@@ -16,16 +16,17 @@ const io = socketIo(server, { path: '/socket.io' });
 mongoose.connect(process.env.MONGODB_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true
-}).then(() => console.log("MongoDB 연결 성공"))
-  .catch(err => console.error("MongoDB 연결 실패:", err));
+})
+.then(() => console.log("MongoDB 연결 성공"))
+.catch(err => console.error("MongoDB 연결 실패:", err));
 
 // ---------------------------
 // 예약 모델
 // ---------------------------
 const Reservation = mongoose.model('Reservation', {
     name: String,
-    date: String,       // YYYY-MM-DD
-    startTime: Number,  // 6~23
+    date: String,
+    startTime: Number,
     endTime: Number
 });
 
@@ -35,16 +36,21 @@ const Reservation = mongoose.model('Reservation', {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.set('trust proxy', 1); // HTTPS 환경
+app.set('trust proxy', 1);
 app.use(session({
     secret: "REALLY_SECRET_KEY",
     resave: false,
     saveUninitialized: true,
-    cookie: { 
+    cookie: {
         maxAge: 1000 * 60 * 60,
         secure: process.env.NODE_ENV === 'production'
     }
 }));
+
+// ---------------------------
+// ✅ 정적 파일은 인증 없이 제공 (중요!!)
+// ---------------------------
+app.use(express.static(path.join(__dirname, 'public')));
 
 // ---------------------------
 // 인증 미들웨어
@@ -55,18 +61,10 @@ function checkAuth(req, res, next) {
 }
 
 // ---------------------------
-// public 폴더 절대 경로
-// ---------------------------
-const publicPath = path.join(__dirname, 'public');
-
-// 정적 파일 제공 (CSS, JS)
-app.use('/static', express.static(publicPath));
-
-// ---------------------------
 // 로그인 페이지
 // ---------------------------
 app.get('/login', (req, res) => {
-    res.sendFile(path.join(publicPath, 'login.html'));
+    res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
 app.post('/login', (req, res) => {
@@ -87,14 +85,14 @@ app.get('/check-auth', (req, res) => {
 });
 
 // ---------------------------
-// 메인 페이지
+// 메인 페이지 (로그인 필요)
 // ---------------------------
 app.get('/', checkAuth, (req, res) => {
-    res.sendFile(path.join(publicPath, 'index.html'));
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // ---------------------------
-// 예약 API
+// 예약 API (로그인 필요)
 // ---------------------------
 app.get('/api/reservations', checkAuth, async (req, res) => {
     try {
@@ -116,7 +114,8 @@ app.post('/api/reservations', checkAuth, async (req, res) => {
             { $group: { _id: "$name", total: { $sum: { $subtract: ["$endTime", "$startTime"] } } } }
         ]);
         const today = dayReservations.find(r => r._id === name);
-        if (today && today.total + duration > 2) return res.status(400).send("하루 최대 2시간까지 예약 가능합니다.");
+        if (today && today.total + duration > 2)
+            return res.status(400).send("하루 최대 2시간까지 예약 가능합니다.");
 
         // 주간 최대 6시간
         const dayObj = new Date(date);
@@ -132,14 +131,16 @@ app.post('/api/reservations', checkAuth, async (req, res) => {
             },
             { $group: { _id: "$name", total: { $sum: { $subtract: ["$endTime", "$startTime"] } } } }
         ]);
-        if (weekReservations.length && weekReservations[0].total + duration > 6) return res.status(400).send("일주일 최대 6시간까지 예약 가능합니다.");
+
+        if (weekReservations.length && weekReservations[0].total + duration > 6)
+            return res.status(400).send("일주일 최대 6시간까지 예약 가능합니다.");
 
         // 시간 겹침 확인
         const conflict = await Reservation.findOne({
             date,
             $or: [
                 { startTime: { $lt: endTime, $gte: startTime } },
-                { endTime: { $gt: startHour, $lte: endTime } },
+                { endTime: { $gt: startTime, $lte: endTime } },
                 { startTime: { $lte: startTime }, endTime: { $gte: endTime } }
             ]
         });
@@ -161,6 +162,7 @@ app.delete('/api/reservations/:id', checkAuth, async (req, res) => {
     try {
         const result = await Reservation.findByIdAndDelete(req.params.id);
         if (!result) return res.status(404).json({ message: "예약을 찾을 수 없습니다." });
+
         io.emit('updateReservations', { deletedId: req.params.id });
         res.status(204).send();
     } catch (err) {
@@ -170,6 +172,7 @@ app.delete('/api/reservations/:id', checkAuth, async (req, res) => {
 
 // ---------------------------
 // Socket.io
+// ---------------------------
 io.on('connection', (socket) => {
     console.log('사용자가 연결되었습니다.');
     socket.on('disconnect', () => console.log('사용자가 연결을 종료했습니다.'));
